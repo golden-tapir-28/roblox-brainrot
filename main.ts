@@ -1,16 +1,21 @@
-// A working roblox-brainrot-01 entry (Node 22, standard library only): the game is this directory's Rojo
-// project, built into game.rbxl with `rojo build default.project.json --output game.rbxl`, and the program
-// hands it in. It copies game.rbxl, src/, screenshots/ and PLAY.json from beside this file to /output and
-// writes /output/dossier.json, the summary the judge reads, with the vendored make.fun library. A starting
-// point, not a winner: it is a grey square that moves with the arrow keys. Build your game, rebuild
-// game.rbxl, put your PNG or JPEG screenshots in screenshots/ (the first by name is the cover, and one of
-// them is the thumbnail you upload for your game on Roblox) and fill in PLAY.json with your published place.
+// Brainrot Bay — the entry program for make.fun's roblox-brainrot-01.
+// Node 22, standard library only.
 //
-// Every name under /output starts with a letter, a digit or _ and holds only letters, digits, . _ and -: the
-// grader fails an entry whose output holds any other, so a file such as .gitkeep or .DS_Store copied in fails it.
-// So src/ and screenshots/ are copied without any name that starts with a dot, at any depth.
+// The game is the Rojo project in this directory: build it first with
+// `rojo build default.project.json --output game.rbxl`, then this program
+// hands the entry in. It copies game.rbxl, src/, screenshots/ and
+// PLAY.json from beside this file into /output and writes
+// /output/dossier.json, the summary the judge reads, with the vendored
+// make.fun library (vendor/makefun-roblox.ts, unchanged).
 //
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
+// Every name under /output must start with a letter, a digit or _ and
+// hold only letters, digits, . _ and -: the grader refuses an entry whose
+// output holds any other name, so src/ and screenshots/ are copied while
+// leaving out every file or directory whose name starts with a dot
+// (a .gitkeep or .DS_Store would fail the entry).
+//
+// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for
+// /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
 import { copyFileSync, cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -21,19 +26,28 @@ import { buildDossier } from './vendor/makefun-roblox.ts';
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-/** cpSync's filter: leave out every file and directory whose name starts with a dot (.gitkeep, .DS_Store, .git). */
+/** cpSync's filter: skip every file and directory whose name starts with a dot. */
 const notDotted = (path: string): boolean => !basename(path).startsWith('.');
 
 copyFileSync(join(here, 'game.rbxl'), join(out, 'game.rbxl'));
 copyFileSync(join(here, 'PLAY.json'), join(out, 'PLAY.json'));
 cpSync(join(here, 'src'), join(out, 'src'), { recursive: true, filter: notDotted });
 mkdirSync(join(out, 'screenshots'), { recursive: true });
-if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true, filter: notDotted });
+if (existsSync(join(here, 'screenshots'))) {
+	cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true, filter: notDotted });
+}
 
-// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes; the others refuse an entry the
-// scorer would refuse (more than 4 screenshots or one over 256 KiB; a place of more than 500000 instances, whose
-// scripts' sources come to over 8 MiB or whose scripts' paths come to over 1048576 characters, in all).
+// The gate's caps, from the kit's reference/gate.json: the dossier text is
+// capped at 64 KiB, at most 4 screenshots of at most 256 KiB each, the
+// place holds at most 500,000 instances, and its scripts hold at most
+// 8 MiB of source with at most 1,048,576 characters of script paths.
 writeFileSync(
-  join(out, 'dossier.json'),
-  buildDossier(out, { text_max_bytes: 65536, screenshots: { max: 4, max_bytes: 262144 }, max_instances: 500000, scripts_max_source_bytes: 8388608, scripts_max_path_chars: 1048576 }),
+	join(out, 'dossier.json'),
+	buildDossier(out, {
+		text_max_bytes: 65536,
+		screenshots: { max: 4, max_bytes: 262144 },
+		max_instances: 500000,
+		scripts_max_source_bytes: 8388608,
+		scripts_max_path_chars: 1048576,
+	}),
 );

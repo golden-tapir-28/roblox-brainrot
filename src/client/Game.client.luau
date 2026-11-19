@@ -1,88 +1,98 @@
--- A square that moves with the arrow keys inside a grey box.
+-- Game.client: Brainrot Bay's client entry point.
+--
+-- One job: wire the HUD to the server. The server pushes state twice a
+-- second (money, income, lock, rain, stats); this script shows it, and
+-- sends the player's choices back through one RemoteFunction: buy a lure,
+-- buy an upgrade, lock the base, rebirth. Sounds play here, on the
+-- client, when the server asks for them.
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local BrainrotData = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BrainrotData"))
+local Hud = require(script.Parent:WaitForChild("Hud"))
+local Sounds = require(script.Parent:WaitForChild("Sounds"))
 
 local player = Players.LocalPlayer
+local remotes = ReplicatedStorage:WaitForChild("BrainrotRemotes")
+local stateEvent = remotes:WaitForChild("StateUpdate")
+local toastEvent = remotes:WaitForChild("Toast")
+local soundEvent = remotes:WaitForChild("PlaySound")
+local shopFunction = remotes:WaitForChild("ShopAction")
 
-local ARENA_WIDTH = 640
-local ARENA_HEIGHT = 480
-local SQUARE_SIZE = 48
-local SPEED = 320 -- pixels per second
+local hud
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "GameGui"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-
-local background = Instance.new("Frame")
-background.Name = "Background"
-background.Size = UDim2.fromScale(1, 1)
-background.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-background.BorderSizePixel = 0
-background.Parent = gui
-
-local title = Instance.new("TextLabel")
-title.Name = "Hint"
-title.AnchorPoint = Vector2.new(0.5, 0)
-title.Position = UDim2.new(0.5, 0, 0.5, -ARENA_HEIGHT / 2 - 56)
-title.Size = UDim2.fromOffset(ARENA_WIDTH, 40)
-title.BackgroundTransparency = 1
-title.Text = "Use the arrow keys to move the square"
-title.TextColor3 = Color3.fromRGB(230, 230, 230)
-title.TextSize = 24
-title.Font = Enum.Font.SourceSans
-title.Parent = background
-
-local arena = Instance.new("Frame")
-arena.Name = "Arena"
-arena.AnchorPoint = Vector2.new(0.5, 0.5)
-arena.Position = UDim2.fromScale(0.5, 0.5)
-arena.Size = UDim2.fromOffset(ARENA_WIDTH, ARENA_HEIGHT)
-arena.BackgroundColor3 = Color3.fromRGB(110, 110, 110)
-arena.BorderColor3 = Color3.fromRGB(30, 30, 30)
-arena.BorderSizePixel = 2
-arena.Parent = background
-
-local square = Instance.new("Frame")
-square.Name = "Square"
-square.Size = UDim2.fromOffset(SQUARE_SIZE, SQUARE_SIZE)
-square.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-square.BorderColor3 = Color3.fromRGB(30, 30, 30)
-square.BorderSizePixel = 2
-square.Parent = arena
-
--- The square's top-left corner inside the arena, starting in the middle.
-local x = (ARENA_WIDTH - SQUARE_SIZE) / 2
-local y = (ARENA_HEIGHT - SQUARE_SIZE) / 2
-
-local function place()
-	square.Position = UDim2.fromOffset(math.floor(x + 0.5), math.floor(y + 0.5))
-end
-
-place()
-gui.Parent = player:WaitForChild("PlayerGui")
-
-RunService.RenderStepped:Connect(function(dt)
-	local dx = 0
-	local dy = 0
-	if UserInputService:IsKeyDown(Enum.KeyCode.Left) then
-		dx -= 1
-	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.Right) then
-		dx += 1
-	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.Up) then
-		dy -= 1
-	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.Down) then
-		dy += 1
-	end
-	if dx == 0 and dy == 0 then
+local function callShop(action, arg)
+	local result = nil
+	local ok = pcall(function()
+		result = shopFunction:InvokeServer(action, arg)
+	end)
+	if not ok or not result then
+		hud.toast("The shop didn't answer. Try again.")
 		return
 	end
-	x = math.clamp(x + dx * SPEED * dt, 0, ARENA_WIDTH - SQUARE_SIZE)
-	y = math.clamp(y + dy * SPEED * dt, 0, ARENA_HEIGHT - SQUARE_SIZE)
-	place()
+	if result.ok == false and result.reason then
+		hud.toast(result.reason)
+		Sounds.play("error")
+	end
+end
+
+hud = Hud.build({
+	click = function()
+		Sounds.play("click")
+	end,
+	buyLure = function(lureId)
+		Sounds.play("click")
+		callShop("buyLure", lureId)
+	end,
+	buyUpgrade = function(upgradeId)
+		Sounds.play("click")
+		callShop("buyUpgrade", upgradeId)
+	end,
+	lockBase = function()
+		Sounds.play("click")
+		callShop("lockBase")
+	end,
+	rebirth = function()
+		Sounds.play("click")
+		callShop("rebirth")
+	end,
+})
+
+stateEvent.OnClientEvent:Connect(function(snap)
+	if not snap then
+		return
+	end
+	hud.setMoney(snap.money, snap.incomePerSecond)
+	hud.setRain(snap.rainActive)
+	hud.setLock(snap.locked, snap.lockReadyIn)
+	hud.setRebirth(BrainrotData.rebirthCost(snap.rebirths), snap.rebirths)
+	local slotsMax = BrainrotData.BASE_SLOTS + snap.upgrades.slots * BrainrotData.SLOT_BONUS
+	hud.setStats(snap.catches, snap.totalEarned, snap.rebirths, #snap.brainrots, slotsMax)
 end)
+
+toastEvent.OnClientEvent:Connect(function(text)
+	hud.toast(text)
+end)
+
+soundEvent.OnClientEvent:Connect(function(name)
+	Sounds.play(name)
+end)
+
+-- Ask for the first state right away, instead of waiting for the push.
+task.spawn(function()
+	local snap = nil
+	local ok = pcall(function()
+		snap = shopFunction:InvokeServer("state")
+	end)
+	if ok and snap then
+		hud.setMoney(snap.money, snap.incomePerSecond)
+		hud.setRain(false)
+		hud.setLock(snap.locked, snap.lockReadyIn)
+		hud.setRebirth(BrainrotData.rebirthCost(snap.rebirths), snap.rebirths)
+		local slotsMax = BrainrotData.BASE_SLOTS + snap.upgrades.slots * BrainrotData.SLOT_BONUS
+		hud.setStats(snap.catches, snap.totalEarned, snap.rebirths, #snap.brainrots, slotsMax)
+	end
+end)
+
+print("Brainrot Bay client is ready.")
