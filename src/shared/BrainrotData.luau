@@ -199,6 +199,72 @@ BrainrotData.CAST = {
 		hat = "TopHat",
 		quirk = "The rarest cat in the bay. Do not pet the chairman.",
 	},
+	{
+		id = "butterbean",
+		name = "Baroness Butterbean",
+		rarity = "Uncommon",
+		cost = 800,
+		rate = 18,
+		body = "Ball",
+		color = Color3.fromRGB(245, 215, 110),
+		hat = "Cap",
+		quirk = "Melts on warm toast. Prefers it that way.",
+	},
+	{
+		id = "crumpet",
+		name = "Sir Crumpet McFluff",
+		rarity = "Rare",
+		cost = 5500,
+		rate = 80,
+		body = "Block",
+		color = Color3.fromRGB(200, 150, 90),
+		hat = "TopHat",
+		quirk = "Fluffiest knight in the bay. Butter is his shield.",
+	},
+	{
+		id = "croissant",
+		name = "Madame Croissant",
+		rarity = "Epic",
+		cost = 32000,
+		rate = 360,
+		body = "Ball",
+		color = Color3.fromRGB(235, 180, 80),
+		hat = "Crown",
+		quirk = "Flaky, fabulous, and always fashionably late.",
+	},
+	{
+		id = "donutduke",
+		name = "Duke of Donut",
+		rarity = "Legendary",
+		cost = 200000,
+		rate = 1700,
+		body = "Ball",
+		color = Color3.fromRGB(240, 140, 180),
+		hat = "Crown",
+		quirk = "Sprinkles for a crown. Glaze for a throne.",
+	},
+	{
+		id = "pretzel",
+		name = "The Infinite Pretzel",
+		rarity = "Mythic",
+		cost = 1500000,
+		rate = 9000,
+		body = "Block",
+		color = Color3.fromRGB(170, 120, 60),
+		hat = "Wizard",
+		quirk = "Twisted beyond time. Still salty about it.",
+	},
+	{
+		id = "jellybean",
+		name = "Empress Jellybean",
+		rarity = "Secret",
+		cost = 5000000,
+		rate = 26000,
+		body = "Ball",
+		color = Color3.fromRGB(255, 90, 200),
+		hat = "Crown",
+		quirk = "Ruler of the candy aisle. Sweet, but do not cross her.",
+	},
 }
 
 -- Look a brainrot up by id; returns nil when the id is unknown.
@@ -231,7 +297,7 @@ end
 -- Weighted pick of a cast member for the conveyor. Cheap ones parade
 -- often; the chairman almost never shows his face.
 function BrainrotData.rollSpawn()
-	local weights = { 30, 24, 16, 12, 8, 5, 2.4, 1.4, 0.7, 0.35, 0.12, 0.03 }
+	local weights = { 30, 24, 16, 12, 8, 5, 2.4, 1.4, 0.7, 0.35, 0.12, 0.03, 14, 6.5, 1.8, 0.5, 0.07, 0.015 }
 	local total = 0
 	for _, w in ipairs(weights) do
 		total += w
